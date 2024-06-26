@@ -900,12 +900,23 @@ export default function Map() {
           type: 'fill',
           source: 'ward',
           paint: {
-            'fill-color': 'transparent', // Set fill color to transparent for hollow effect
-    'fill-outline-color': '#088', // Color for the outline (border)
-    'fill-opacity': 1,
-    'fill-outline-width': 2// Width of the border
+            'fill-color': '#088',
+            'fill-opacity': 0
+  
           }
+
+        
         });
+
+        mapRef.current.addLayer({
+          id: 'ward-border',
+          type: 'line',
+          source: 'ward',
+          paint: {
+              'line-color': '#000000',  // Border color black
+              'line-width': 2           // Border thickness
+          }
+      });
 
         // Fit map to ward bounds
         const bounds = new maplibregl.LngLatBounds();
