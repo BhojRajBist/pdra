@@ -11,34 +11,6 @@ const Building = () => {
   const [buildingsFetched, setBuildingsFetched] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const initializeMap = () => {
-      mapRef.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: `https://api.maptiler.com/maps/basic-v2/style.json?key=${API_KEY}`,
-        center: [80.326, 28.946], // Center of Mahendranagar City
-        zoom: 14, // Adjust zoom level as needed
-      });
-
-      mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
-
-      mapRef.current.on('load', () => {
-        // Fetch and display buildings
-        fetchBuildings();
-      });
-    };
-
-    if (!mapRef.current) {
-      initializeMap();
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-      }
-    };
-  }, []);
-
   const fetchBuildings = async () => {
     if (buildingsFetched) return; // Prevent multiple fetches
 
@@ -107,6 +79,34 @@ const Building = () => {
     }
   };
 
+  useEffect(() => {
+    const initializeMap = () => {
+      mapRef.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: `https://api.maptiler.com/maps/basic-v2/style.json?key=${API_KEY}`,
+        center: [80.326, 28.946], // Center of Mahendranagar City
+        zoom: 14, // Adjust zoom level as needed
+      });
+
+      mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
+
+      mapRef.current.on('load', () => {
+        // Fetch and display buildings
+        fetchBuildings();
+      });
+    };
+
+    if (!mapRef.current) {
+      initializeMap();
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+      }
+    };
+  }, []); // No dependencies to run effect only once on component mount
+
   return (
     <div>
       <h2>Buildings in Mahendranagar City</h2>
@@ -117,4 +117,5 @@ const Building = () => {
 };
 
 export default Building;
+
 
