@@ -1,0 +1,9 @@
+To fetch the building data of the kanchanpur District
+ it is for the demo replace the coordinates with the actual
+ whose building is to be fetched
+
+
+https://overpass-api.de/api/interpreter?data=[out:json];way["building"](28.6500,80.0333,29.3833,80.3833);out body;
+
+
+
