@@ -774,7 +774,7 @@
 
 
 
-//This is the complete working code 
+// This is the complete working code 
 
 
 
@@ -1041,16 +1041,16 @@
 // }
 
 
-
-
 import React, { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import './map.css'; 
+import './map.css';
+import * as turf from '@turf/turf';
 
 const API_BASE_URL = "http://127.0.0.1:8000"; // Replace with your API base URL
 const API_KEY = "zSKe702Zq1told0U6bDZ";
 
+// Legend items with color and label for different flood classifications
 const legendItems = [
   { color: '#0000FF', label: 'न्यून डुबान' },   // Blue
   { color: '#FFA500', label: 'मध्यम डुबान' }, // Orange
@@ -1065,12 +1065,9 @@ export default function Map() {
   const [districtOptions, setDistrictOptions] = useState([]);
   const [municipalityOptions, setMunicipalityOptions] = useState([]);
   const [wardOptions, setWardOptions] = useState([]);
-  const [layerVisibility, setLayerVisibility] = useState({
-    low: true,
-    medium: true,
-    high: true,
-    very_high: true
-  });
+  const [floodExtent, setFloodExtent] = useState(null); // State to track selected flood extent
+  const [floodZoneArea, setFloodZoneArea] = useState(null); // State to track flood zone area
+  const [wardBoundaryArea, setWardBoundaryArea] = useState(null); // State to track ward boundary area
 
   useEffect(() => {
     mapRef.current = new maplibregl.Map({
@@ -1082,81 +1079,134 @@ export default function Map() {
 
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
+    // Fetch provinces on component mount
     fetch(`${API_BASE_URL}/api/provinces/`)
       .then(response => response.json())
       .then(data => setProvinceOptions(data))
       .catch(error => console.log(error));
 
+    // Fetch and add flood zones initially
     fetchFloodZones();
 
     return () => mapRef.current.remove();
   }, []);
 
-  const fetchFloodZones = async () => {
+  useEffect(() => {
+    if (floodExtent) {
+      fetchFloodZones(floodExtent); // Fetch flood zones when floodExtent changes
+    }
+  }, [floodExtent]);
+
+  const fetchFloodZones = async (extent) => {
+    const wardId = document.getElementById('ward').value;
+    if (!wardId) {
+      alert("Please select a ward.");
+      return;
+    }
+
+    let apiUrl = "";
+    if (extent === "2yr") {
+      apiUrl = `${API_BASE_URL}/api/2yr/${wardId}/`;
+    } else if (extent === "5yr") {
+      apiUrl = `${API_BASE_URL}/api/5yr/${wardId}/`;
+    } else {
+      console.error("Invalid flood extent selected.");
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/flood-zones/`);
+      const response = await fetch(apiUrl);
       const data = await response.json();
 
       if (data && data.type === "FeatureCollection" && data.features.length > 0) {
-        mapRef.current.addSource('flood-zones', {
-          type: 'geojson',
-          data: data
-        });
+        // Add flood zones to the map
+        if (mapRef.current.getSource('flood-zones')) {
+          mapRef.current.getSource('flood-zones').setData(data);
+        } else {
+          mapRef.current.addSource('flood-zones', {
+            type: 'geojson',
+            data: data
+          });
 
-        mapRef.current.addLayer({
-          id: 'flood-zones-low',
-          type: 'fill',
-          source: 'flood-zones',
-          filter: ['==', ['get', 'classification'], 'shallow'],
-          paint: {
-            'fill-color': legendItems[0].color,
-            'fill-opacity': 0.5
-          },
-          layout: { visibility: layerVisibility.low ? 'visible' : 'none' }
-        });
+          mapRef.current.addLayer({
+            id: 'flood-zones',
+            type: 'fill',
+            source: 'flood-zones',
+            paint: {
+              'fill-color': [
+                'match',
+                ['get', 'classification'],
+                'shallow', legendItems[0].color,
+                'medium', legendItems[1].color,
+                'high', legendItems[2].color,
+                'very_high', legendItems[3].color,
+                '#000000' // fallback color if classification doesn't match
+              ],
+              'fill-opacity': 0.5
+            }
+          });
+        }
 
-        mapRef.current.addLayer({
-          id: 'flood-zones-medium',
-          type: 'fill',
-          source: 'flood-zones',
-          filter: ['==', ['get', 'classification'], 'medium'],
-          paint: {
-            'fill-color': legendItems[1].color,
-            'fill-opacity': 0.5
-          },
-          layout: { visibility: layerVisibility.medium ? 'visible' : 'none' }
+        // Fit map to ward bounding box
+        const bounds = new maplibregl.LngLatBounds();
+        data.features.forEach(feature => {
+          feature.geometry.coordinates[0].forEach(coord => {
+            bounds.extend(coord);
+          });
         });
+        mapRef.current.fitBounds(bounds, { padding: 20 });
 
-        mapRef.current.addLayer({
-          id: 'flood-zones-high',
-          type: 'fill',
-          source: 'flood-zones',
-          filter: ['==', ['get', 'classification'], 'high'],
-          paint: {
-            'fill-color': legendItems[2].color,
-            'fill-opacity': 0.5
-          },
-          layout: { visibility: layerVisibility.high ? 'visible' : 'none' }
-        });
+        // Calculate and set flood zone area
+        const floodZoneArea = turf.area(data);
+        setFloodZoneArea(floodZoneArea);
 
-        mapRef.current.addLayer({
-          id: 'flood-zones-very-high',
-          type: 'fill',
-          source: 'flood-zones',
-          filter: ['==', ['get', 'classification'], 'very_high'],
-          paint: {
-            'fill-color': legendItems[3].color,
-            'fill-opacity': 0.5
-          },
-          layout: { visibility: layerVisibility.very_high ? 'visible' : 'none' }
-        });
+        // Fetch and display ward boundary
+        fetchWardBoundary(wardId);
 
+        // Add legend
         addLegend();
       } else {
         console.error('Invalid or empty flood zone data.');
       }
     } catch (error) {
       console.error('Error fetching flood zones:', error);
+    }
+  };
+
+  const fetchWardBoundary = async (wardId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/wards/${wardId}/boundary/`);
+      const data = await response.json();
+
+      if (data && data.type === "FeatureCollection" && data.features.length > 0) {
+        // Add ward boundary to the map
+        if (mapRef.current.getSource('ward-boundary')) {
+          mapRef.current.getSource('ward-boundary').setData(data);
+        } else {
+          mapRef.current.addSource('ward-boundary', {
+            type: 'geojson',
+            data: data
+          });
+
+          mapRef.current.addLayer({
+            id: 'ward-boundary',
+            type: 'line',
+            source: 'ward-boundary',
+            paint: {
+              'line-color': '#0a0a0a',
+              'line-width': 2
+            }
+          });
+        }
+
+        // Calculate and set ward boundary area
+        const wardBoundaryArea = turf.area(data);
+        setWardBoundaryArea(wardBoundaryArea);
+      } else {
+        console.error('Invalid or empty ward boundary data.');
+      }
+    } catch (error) {
+      console.error('Error fetching ward boundary:', error);
     }
   };
 
@@ -1173,80 +1223,10 @@ export default function Map() {
     mapContainer.current.appendChild(legend);
   };
 
-  const handleLayerToggle = (layerName) => {
-    setLayerVisibility(prevState => ({
-      ...prevState,
-      [layerName]: !prevState[layerName]
-    }));
-
-    // Adjust layer visibility
-    mapRef.current.setLayoutProperty(
-      `flood-zones-${layerName}`,
-      'visibility',
-      layerVisibility[layerName] ? 'none' : 'visible'
-    );
-  };
-
-  const handleWardFormSubmit = async (event) => {
+  const handleWardFormSubmit = (event) => {
     event.preventDefault();
-    const wardId = document.getElementById('ward').value;
-    if (!wardId) {
-      alert("Please select a ward.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/ward-geojson/${wardId}/`);
-      const data = await response.json();
-
-      if (data && data.type === "MultiPolygon" && Array.isArray(data.coordinates)) {
-        const geojsonSource = {
-          type: 'geojson',
-          data: data
-        };
-
-        if (mapRef.current.getSource('ward')) {
-          mapRef.current.removeLayer('ward');
-          mapRef.current.removeSource('ward');
-        }
-
-        mapRef.current.addSource('ward', geojsonSource);
-        mapRef.current.addLayer({
-          id: 'ward',
-          type: 'fill',
-          source: 'ward',
-          paint: {
-            'fill-color': '#088',
-            'fill-opacity': 0
-          }
-        });
-
-        mapRef.current.addLayer({
-          id: 'ward-border',
-          type: 'line',
-          source: 'ward',
-          paint: {
-            'line-color': '#000000',
-            'line-width': 2
-          }
-        });
-
-        const bounds = new maplibregl.LngLatBounds();
-        data.coordinates.forEach(polygon => {
-          polygon.forEach(ring => {
-            ring.forEach(coord => {
-              bounds.extend(coord);
-            });
-          });
-        });
-        mapRef.current.fitBounds(bounds, { padding: 20 });
-      } else {
-        alert('Invalid GeoJSON data.');
-      }
-    } catch (error) {
-      console.log(error);
-      alert('Error fetching ward data. Check the console for more details.');
-    }
+    const selectedExtent = document.getElementById('floodExtent').value;
+    setFloodExtent(selectedExtent); // Update state with selected flood extent
   };
 
   const handleProvinceChange = async (event) => {
@@ -1322,27 +1302,18 @@ export default function Map() {
             ))}
           </select><br /><br />
 
+          {/* Dropdown for flood extent */}
+          <label htmlFor="floodExtent">Select Flood Extent:</label>
+          <select id="floodExtent" name="floodExtent">
+            <option value="2yr">2 Year Flood Extent</option>
+            <option value="5yr">5 Year Flood Extent</option>
+          </select><br /><br />
+
           <button type="submit">Get Ward GeoJSON</button>
         </form>
-
-        {/* Add Layer Button */}
-        <div style={{ marginTop: '20px' }}>
-          <h3>Add Layer:</h3>
-          {legendItems.map((item, index) => (
-            <div key={index} style={{ marginBottom: '10px' }}>
-              <input
-                type="checkbox"
-                id={item.label}
-                checked={layerVisibility[item.label.toLowerCase().replace(/ /g, '_')]}
-                onChange={() => handleLayerToggle(item.label.toLowerCase().replace(/ /g, '_'))}
-              />
-              <label htmlFor={item.label}>{item.label}</label>
-            </div>
-          ))}
-        </div>
       </div>
 
-      <div style={{ width: "80%", position: "relative" }}>
+      <div style={{ width: "65%", position: "relative" }}>
         <div id="map" ref={mapContainer} style={{ height: "100%", width: "100%" }} />
 
         {/* Legend */}
@@ -1355,6 +1326,13 @@ export default function Map() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Right Sidebar */}
+      <div style={{ width: "15%", backgroundColor: "#f8f8f8", padding: "20px" }}>
+        <h2>Flood Zone Info</h2>
+        <p><strong>Flood Zone Area:</strong> {floodZoneArea ? (floodZoneArea / 1e6).toFixed(2) + ' km²' : 'N/A'}</p>
+        <p><strong>Ward Boundary Area:</strong> {wardBoundaryArea ? (wardBoundaryArea / 1e6).toFixed(2) + ' km²' : 'N/A'}</p>
       </div>
     </div>
   );
