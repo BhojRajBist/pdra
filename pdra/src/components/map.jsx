@@ -1127,7 +1127,6 @@ export default function Map() {
             type: 'geojson',
             data: data
           });
-
           mapRef.current.addLayer({
             id: 'flood-zones',
             type: 'fill',
@@ -1137,14 +1136,15 @@ export default function Map() {
                 'match',
                 ['get', 'classification'],
                 'shallow', legendItems[0].color,
-                'medium', legendItems[1].color,
-                'high', legendItems[2].color,
-                'very_high', legendItems[3].color,
+                'moderate', legendItems[1].color,
+                'deep', legendItems[2].color,
+                'अति उच्च डुबान', legendItems[3].color,
                 '#000000' // fallback color if classification doesn't match
               ],
               'fill-opacity': 0.5
             }
           });
+          
         }
 
         // Fit map to ward bounding box
