@@ -7,3 +7,188 @@ https://overpass-api.de/api/interpreter?data=[out:json];way["building"](28.6500,
 
 
 
+
+
+// Get forecast data (ncmrwf Image)
+function getNcmrwfImage(dt, numday) {
+  
+  // Forecast data
+  //-----------------------------------------
+  //-----------------------NCMRWF------------------------------
+  //-----------------------------------------
+  
+  // Format the current date to a specific string format if needed
+  // var dateString = dt.format('YYYYMMdd');
+  var dateString = dt.format('20240702');
+  
+ 
+
+  // Define the forecast origin date for the folder 
+  var folderDate = dateString;  // Example date, change as needed, as per latest NCMRWF data stored in GCS
+  print('Folder Date: ', folderDate)
+  
+
+  // All the GeoTiffs are in this folder.
+  var uriBase = ee.String('gs://ncmrwf-nepal/Forecast/NCMRWF/').cat(folderDate).cat('/');
+  
+  // Construct forecast origin date
+  var forecastOriginDate = ee.Date.parse('YYYYMMdd', folderDate);
+
+
+  // Helper function to pad numbers with leading zeros
+  function pad2(num) {
+    return ee.Number(num).format('%02d');
+  }
+  
+  function pad3(num) {
+    return ee.Number(num).format('%03d');
+  }
+  
+  // Generate a list of URIs
+  var uris = ee.List.sequence(1, 41).map(function(i) {
+    var timeStepHours = ee.Algorithms.If(
+      ee.Number(i).lte(25),
+      ee.Number(i).multiply(3),
+      ee.Number(i).multiply(3).subtract(2)
+    );
+    
+    var timeStepStr = ee.Algorithms.If(
+      ee.Number(i).lte(25),
+      pad3(timeStepHours),
+      pad3(timeStepHours)
+    );
+    
+    var fileSuffix = ee.Algorithms.If(
+      ee.Number(i).lte(25),
+      'R4KMC.tif',
+      'R12.5KMC.tif'
+    );
+  
+    var forecastHourIndex = pad2(i);
+    var forecastTime = forecastOriginDate.advance(timeStepHours, 'hour');
+    var forecastTimeStr = forecastTime.format('yyyyMMddHH'); // Adjusted format
+  
+    // Construct URI for each GeoTIFF file
+    return uriBase.cat('NCMRWF_Nepal_').cat(forecastTimeStr).cat('F')
+      .cat(forecastHourIndex).cat('O')
+      .cat(folderDate).cat('00H')
+      .cat(timeStepStr).cat(fileSuffix);
+  });
+  
+  // Print the URIs to verify
+  print('URIs:', uris);
+  
+  // Function to extract file name from URI
+  function extractFileName(uri) {
+    var parts = ee.String(uri).split('/');
+    return parts.get(-1); // Get the last part
+  }
+  
+  // Make a collection from the list of images with IDs
+  var images = uris.map(function(uri) {
+    var fileName = extractFileName(uri);
+    var image = ee.Image.loadGeoTIFF(uri).set('system:id', fileName);
+    
+    // Rename band "B0" to "precipitation"
+    var renamedImage = image.select("B0").rename("precipitation");
+  
+    return renamedImage;
+  });
+  
+  var ncmrwfCollection = ee.ImageCollection(images);
+  print('NCMRWF:', ncmrwfCollection)
+  
+  // Get the first image from the collection
+  var firstImage = ee.Image(ncmrwfCollection.first());
+  
+  // Function to extract date and other metadata from image ID and add as properties
+  function addImageTime(image) {
+    // Get image ID
+    var imageId = image.get('system:id');
+  
+    // Split image ID to extract date and metadata
+    var parts = ee.String(imageId).split('_');
+    var dateParts = parts.get(-1);
+  
+    var forecastDate = ee.String(dateParts).split('F').get(0);
+    var forecastTime = ee.Date.parse('yyyyMMddHH', forecastDate);
+    var forecastTimeMillis = forecastTime.millis();
+    
+    var notForecastDate = ee.String(dateParts).split('F').get(1);
+    var forecastIndex = ee.String(notForecastDate).split('O').get(0);
+    var forecastIndexN = ee.Number.parse(forecastIndex);
+    var notForecastIndex = ee.String(notForecastDate).split('O').get(1);
+  
+    var creationDate = ee.String(notForecastIndex).split('H').get(0);
+    var creationTime = ee.Date.parse('yyyyMMddHH', creationDate);
+    var creationTimeMillis = creationTime.millis();
+    
+    var notCreationDate = ee.String(notForecastIndex).split('H').get(1);
+    var forecastHrs = ee.String(notCreationDate).split('R').get(0);
+    var forecastHrsN = ee.Number.parse(forecastHrs);
+    
+  
+    // Add creation time, forecast hours, and forecast time to image properties
+    return image.set({
+      'creation_time': creationTimeMillis,
+      'forecast_hours': forecastHrsN,
+      'forecast_time': forecastTimeMillis,
+    });
+  }
+  
+  // Map the addImageTime function over the image collection to add properties
+  var ncmrwfCollectionWithDates = ncmrwfCollection.map(addImageTime);
+  var ncmrwf = ncmrwfCollectionWithDates; 
+
+  
+  //-----------------------------------------
+  //-----------------------NCMRWF------------------------------
+  //-----------------------------------------
+  
+  
+  // Grab forecast data for hours 3,6,9,12,15,18,21,24 (Day1) 27,30,33,36,39,42,45,48 (Day2) 51,54,57,60,63,66,69,72 (Day3) 
+  var hours = [];
+  for (var i = 0; i < numday; i++) {
+    for (var j = 0; j < 8; j++) {
+      var h = (i * 24) + ((j + 1) * 3);
+      hours.push(h);
+    }
+  }
+
+  return ncmrwf
+    .select('precipitation')
+    //.filterDate(dt, dt.advance(3, 'hour'))
+    .filter(ee.Filter.inList('forecast_hours', hours))
+    //.map(maskImage)
+    .sum()
+    // .resample('bicubic') // One of 'bilinear' or 'bicubic'
+    //.reproject({
+      //crs: IMERGprojection.atScale(11131.949079327358)
+    //});
+}
+
+// Fetch the current date
+var currentDate = ee.Date(Date.now());
+
+print('Current Date:', currentDate);
+
+// Format the current date to a specific string format if needed
+var currentDateString = currentDate.format('YYYYMMdd');
+print('Formatted Current Date:', currentDateString);
+
+// Subtract 1 day from the current date
+var dateMinus = currentDate.advance(-1, 'day');
+
+// Format the subtracted date to a specific string format
+var dateMinusString = dateMinus.format('YYYYMMdd');
+print('Date Minus 1 Day:', dateMinusString);
+
+
+var sum1 = getNcmrwfImage(currentDate , 1)
+var sum2 = getNcmrwfImage(currentDate , 2)
+var sum3 = getNcmrwfImage(currentDate , 3)
+
+Map.setCenter(84,28, 7)
+Map.addLayer(sum1, {min: 0, max: 100, palette: ['blue', 'green', 'red']}, 'Sum 1 day Precipitation')
+// Map.addLayer(sum2, {min: 0, max: 100, palette: ['blue', 'green', 'red']}, 'Sum 2 days Precipitation')
+// Map.addLayer(sum3, {min: 0, max: 100, palette: ['blue', 'green', 'red']}, 'Sum 3 days Precipitation')
