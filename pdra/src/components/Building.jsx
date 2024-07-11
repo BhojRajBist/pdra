@@ -117,151 +117,551 @@
 // };
 
 
-import React, { useState, useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+// import React, { useState, useEffect, useRef } from 'react';
+// import L from 'leaflet';
+// import 'leaflet/dist/leaflet.css';
+
+// const WeatherMap = () => {
+//     const mapRef = useRef(null);
+//     const [mapFrames, setMapFrames] = useState([]);
+//     const [animationPosition, setAnimationPosition] = useState(0);
+//     const [animationTimer, setAnimationTimer] = useState(null);
+//     const [optionKind, setOptionKind] = useState('radar'); // 'radar' or 'satellite'
+//     const [optionColorScheme, setOptionColorScheme] = useState('2'); // from 0 to 8
+//     const [optionTileSize, setOptionTileSize] = useState('256'); // 256 or 512
+
+//     useEffect(() => {
+//         const fetchData = async () => {
+//             try {
+//                 const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+//                 const data = await response.json();
+//                 setMapFrames(getFrames(data, optionKind));
+//             } catch (error) {
+//                 console.error('Error fetching weather data:', error);
+//             }
+//         };
+
+//         fetchData();
+
+//         return () => {
+//             if (animationTimer) clearTimeout(animationTimer);
+//         };
+//     }, [optionKind]);
+
+//     useEffect(() => {
+//         if (mapRef.current && mapFrames.length > 0) {
+//             initializeMap();
+//             showFrame(animationPosition);
+//         }
+//     }, [mapFrames]);
+
+//     const initializeMap = () => {
+//         const map = L.map(mapRef.current).setView([0, 0], 1);
+//         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+//             attribution: 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+//         }).addTo(map);
+//         mapRef.current = map;
+//     };
+
+//     const getFrames = (data, kind) => {
+//         let frames = [];
+//         if (!data) return frames;
+
+//         if (kind === 'satellite' && data.satellite && data.satellite.infrared) {
+//             frames = data.satellite.infrared;
+//         } else if (data.radar && data.radar.past) {
+//             frames = data.radar.past;
+//             if (data.radar.nowcast) {
+//                 frames = frames.concat(data.radar.nowcast);
+//             }
+//         }
+//         return frames;
+//     };
+
+//     const showFrame = (position) => {
+//         const nextPosition = position >= mapFrames.length ? 0 : position < 0 ? mapFrames.length - 1 : position;
+//         setAnimationPosition(nextPosition);
+//         changeRadarPosition(nextPosition);
+//     };
+
+//     const changeRadarPosition = (position) => {
+//         if (!mapRef.current || !mapFrames[position]) return;
+
+//         const frame = mapFrames[position];
+//         const colorScheme = optionKind === 'satellite' ? 0 : parseInt(optionColorScheme);
+//         const tileSize = parseInt(optionTileSize);
+//         const url = `${frame.path}/${tileSize}/{z}/{x}/{y}/${colorScheme}/1_1.png`;
+
+//         const layer = L.tileLayer(`https://${url}`, {
+//             tileSize: tileSize,
+//             zIndex: frame.time
+//         });
+
+//         mapRef.current.eachLayer((layer) => {
+//             if (layer instanceof L.TileLayer) {
+//                 mapRef.current.removeLayer(layer);
+//             }
+//         });
+
+//         layer.addTo(mapRef.current);
+
+//         const pastOrForecast = frame.time > Date.now() / 1000 ? 'FORECAST' : 'PAST';
+//         document.getElementById('timestamp').innerHTML = `${pastOrForecast}: ${new Date(frame.time * 1000).toString()}`;
+//     };
+
+//     const stop = () => {
+//         if (animationTimer) {
+//             clearTimeout(animationTimer);
+//             setAnimationTimer(null);
+//         }
+//     };
+
+//     const playStop = () => {
+//         if (animationTimer) {
+//             stop();
+//         } else {
+//             const timer = setInterval(() => {
+//                 showFrame(animationPosition + 1);
+//             }, 500);
+//             setAnimationTimer(timer);
+//         }
+//     };
+
+//     const setKind = (kind) => {
+//         setOptionKind(kind);
+//         setMapFrames(getFrames(apiData, kind));
+//     };
+
+//     const setColors = (e) => {
+//         const colorScheme = e.target.value;
+//         setOptionColorScheme(colorScheme);
+//     };
+
+//     const setTileSize = (e) => {
+//         const tileSize = e.target.value;
+//         setOptionTileSize(tileSize);
+//     };
+
+//     return (
+//         <div style={{ position: 'relative', height: '100vh' }}>
+//             <ul style={{ textAlign: 'center', position: 'absolute', top: 0, left: 0, right: 0, height: 50 }}>
+//                 <li>
+//                     <input type="radio" name="kind" checked={optionKind === 'radar'} onChange={() => setKind('radar')} />
+//                     Radar (Past + Future)
+//                     <input type="radio" name="kind" checked={optionKind === 'satellite'} onChange={() => setKind('satellite')} />
+//                     Infrared Satellite
+//                 </li>
+//                 <li>
+//                     <input type="button" onClick={() => { stop(); showFrame(animationPosition - 1); }} value="&lt;" />
+//                 </li>
+//                 <li>
+//                     <input type="button" onClick={playStop} value="Play / Stop" />
+//                 </li>
+//                 <li>
+//                     <input type="button" onClick={() => { stop(); showFrame(animationPosition + 1); }} value="&gt;" />
+//                 </li>
+//                 <li>
+//                     <select id="colors" value={optionColorScheme} onChange={setColors}>
+//                         <option value="0">Black and White Values</option>
+//                         <option value="1">Original</option>
+//                         <option value="2">Universal Blue</option>
+//                         <option value="3">TITAN</option>
+//                         <option value="4">The Weather Channel</option>
+//                         <option value="5">Meteored</option>
+//                         <option value="6">NEXRAD Level-III</option>
+//                         <option value="7">RAINBOW @ SELEX-SI</option>
+//                         <option value="8">Dark Sky</option>
+//                     </select>
+//                 </li>
+//                 <li>
+//                     <select id="tileSize" value={optionTileSize} onChange={setTileSize}>
+//                         <option value="256">Tile Size: 256</option>
+//                         <option value="512">Tile Size: 512</option>
+//                     </select>
+//                 </li>
+//             </ul>
+//             <div id="timestamp" style={{ textAlign: 'center', position: 'absolute', top: 50, left: 0, right: 0, height: 80 }}>FRAME TIME</div>
+//             <div id="mapid" style={{ position: 'absolute', top: 80, left: 0, bottom: 0, right: 0 }} ref={mapRef}></div>
+//         </div>
+//     );
+// };
+
+// export default WeatherMap;
+
+// WeatherMap.js
+// import React, { useEffect, useState, useRef } from 'react';
+// import maplibre from 'maplibre-gl';
+// import axios from 'axios';
+
+// const WeatherMap = () => {
+//     const mapContainer = useRef(null);
+//     const [map, setMap] = useState(null);
+//     const [weatherData, setWeatherData] = useState(null);
+//     const [animationPosition, setAnimationPosition] = useState(0);
+//     const [animationTimer, setAnimationTimer] = useState(null);
+
+//     useEffect(() => {
+//         axios.get('http://127.0.0.1:8000/api/weather-maps/')
+//             .then(response => {
+//                 setWeatherData(response.data);
+//                 initializeMap(response.data);
+//             })
+//             .catch(error => {
+//                 console.error('Error fetching weather data:', error);
+//             });
+
+//         return () => {
+//             if (map) map.remove();
+//             if (animationTimer) clearTimeout(animationTimer);
+//         }
+//     }, []);
+
+//     const initializeMap = (data) => {
+//         const initialMap = new maplibre.Map({
+//             container: mapContainer.current,
+//             style: 'https://api.maptiler.com/maps/basic/style.json?key=zSKe702Zq1told0U6bDZ',
+//             center: [2.3522, 48.8566],
+//             zoom: 6
+//         });
+
+//         setMap(initialMap);
+
+//         initialMap.on('load', () => {
+//             // Load the first radar or satellite image
+//             if (data.radar && data.radar.past.length > 0) {
+//                 addLayer(data.radar.past[0].path, initialMap);
+//             } else if (data.satellite && data.satellite.infrared.length > 0) {
+//                 addLayer(data.satellite.infrared[0].path, initialMap);
+//             }
+//         });
+//     };
+
+//     const addLayer = (framePath, mapInstance) => {
+//         if (!mapInstance.getLayer(framePath)) {
+//             mapInstance.addSource(framePath, {
+//                 type: 'raster',
+//                 tiles: [
+//                     `https://tilecache.rainviewer.com${framePath}/256/{z}/{x}/{y}/2/1_1.png`
+//                 ],
+//                 tileSize: 256
+//             });
+
+//             mapInstance.addLayer({
+//                 id: framePath,
+//                 type: 'raster',
+//                 source: framePath,
+//                 paint: {
+//                     'raster-opacity': 0.6
+//                 }
+//             });
+//         }
+//     };
+
+//     const changeFrame = (position) => {
+//         if (!weatherData) return;
+
+//         let frame;
+//         if (weatherData.radar && weatherData.radar.past.length > 0) {
+//             frame = weatherData.radar.past[position];
+//             addLayer(frame.path, map);
+//         } else if (weatherData.satellite && weatherData.satellite.infrared.length > 0) {
+//             frame = weatherData.satellite.infrared[position];
+//             addLayer(frame.path, map);
+//         }
+
+//         if (frame) {
+//             setAnimationPosition(position);
+//         }
+//     };
+
+//     const playAnimation = () => {
+//         const nextPosition = (animationPosition + 1) % (weatherData.radar.past.length || weatherData.satellite.infrared.length);
+//         changeFrame(nextPosition);
+//         setAnimationTimer(setTimeout(playAnimation, 50));
+//     };
+
+//     const stopAnimation = () => {
+//         if (animationTimer) {
+//             clearTimeout(animationTimer);
+//             setAnimationTimer(null);
+//         }
+//     };
+
+//     const togglePlayStop = () => {
+//         if (animationTimer) {
+//             stopAnimation();
+//         } else {
+//             playAnimation();
+//         }
+//     };
+
+//     return (
+//         <div>
+//             <div ref={mapContainer} style={{ width: '100%', height: '500px' }} />
+//             <button onClick={togglePlayStop}>
+//                 {animationTimer ? 'Stop' : 'Play'}
+//             </button>
+//         </div>
+//     );
+// };
+
+// export default WeatherMap;
+
+
+
+// import React, { useEffect, useState, useRef } from 'react';
+// import maplibre from 'maplibre-gl';
+// import axios from 'axios';
+
+// const WeatherMap = () => {
+//     const mapContainer = useRef(null);
+//     const [map, setMap] = useState(null);
+//     const [weatherData, setWeatherData] = useState(null);
+//     const [animationPosition, setAnimationPosition] = useState(0);
+//     const [animationTimer, setAnimationTimer] = useState(null);
+
+//     useEffect(() => {
+//         axios.get('http://127.0.0.1:8000/api/weather-maps/')
+//             .then(response => {
+//                 setWeatherData(response.data);
+//                 initializeMap(response.data);
+//             })
+//             .catch(error => {
+//                 console.error('Error fetching weather data:', error);
+//             });
+
+//         return () => {
+//             if (map) map.remove();
+//             if (animationTimer) clearTimeout(animationTimer);
+//         }
+//     }, []);
+
+//     const initializeMap = (data) => {
+//         const initialMap = new maplibre.Map({
+//             container: mapContainer.current,
+//             style: 'https://api.maptiler.com/maps/basic/style.json?key=zSKe702Zq1told0U6bDZ',
+//             center: [84.1240, 28.3949], // Centered on Nepal
+//             zoom: 6
+//         });
+
+//         setMap(initialMap);
+
+//         initialMap.on('load', () => {
+//             // Load the first radar or satellite image
+//             if (data.radar && data.radar.past.length > 0) {
+//                 addLayer(data.radar.past[0].path, initialMap);
+//             } else if (data.satellite && data.satellite.infrared.length > 0) {
+//                 addLayer(data.satellite.infrared[0].path, initialMap);
+//             }
+//         });
+//     };
+
+//     const addLayer = (framePath, mapInstance) => {
+//         if (!mapInstance.getLayer(framePath)) {
+//             mapInstance.addSource(framePath, {
+//                 type: 'raster',
+//                 tiles: [
+//                     `https://tilecache.rainviewer.com${framePath}/256/{z}/{x}/{y}/2/1_1.png`
+//                 ],
+//                 tileSize: 256
+//             });
+
+//             mapInstance.addLayer({
+//                 id: framePath,
+//                 type: 'raster',
+//                 source: framePath,
+//                 paint: {
+//                     'raster-opacity': 0.6
+//                 }
+//             });
+//         }
+//     };
+
+//     const changeFrame = (position) => {
+//         if (!weatherData) return;
+
+//         let frame;
+//         if (weatherData.radar && weatherData.radar.past.length > 0) {
+//             frame = weatherData.radar.past[position];
+//             addLayer(frame.path, map);
+//         } else if (weatherData.satellite && weatherData.satellite.infrared.length > 0) {
+//             frame = weatherData.satellite.infrared[position];
+//             addLayer(frame.path, map);
+//         }
+
+//         if (frame) {
+//             setAnimationPosition(position);
+//         }
+//     };
+
+//     const playAnimation = () => {
+//         const nextPosition = (animationPosition + 1) % (weatherData.radar.past.length || weatherData.satellite.infrared.length);
+//         changeFrame(nextPosition);
+//         setAnimationTimer(setTimeout(playAnimation, 200)); // Faster animation interval (200ms)
+//     };
+
+//     const stopAnimation = () => {
+//         if (animationTimer) {
+//             clearTimeout(animationTimer);
+//             setAnimationTimer(null);
+//         }
+//     };
+
+//     const togglePlayStop = () => {
+//         if (animationTimer) {
+//             stopAnimation();
+//         } else {
+//             playAnimation();
+//         }
+//     };
+
+//     return (
+//         <div>
+//             <div ref={mapContainer} style={{ width: '100%', height: '500px' }} />
+//             <button onClick={togglePlayStop}>
+//                 {animationTimer ? 'Stop' : 'Play'}
+//             </button>
+//         </div>
+//     );
+// };
+
+// export default WeatherMap;
+
+import React, { useEffect, useState, useRef } from 'react';
+import maplibre from 'maplibre-gl';
+import axios from 'axios';
+import './WeatherMap.css'; // Create and import a separate CSS file
 
 const WeatherMap = () => {
-    const mapRef = useRef(null);
-    const [mapFrames, setMapFrames] = useState([]);
+    const mapContainer = useRef(null);
+    const [map, setMap] = useState(null);
+    const [weatherData, setWeatherData] = useState(null);
     const [animationPosition, setAnimationPosition] = useState(0);
     const [animationTimer, setAnimationTimer] = useState(null);
-    const [optionKind, setOptionKind] = useState('radar'); // 'radar' or 'satellite'
-    const [optionColorScheme, setOptionColorScheme] = useState('2'); // from 0 to 8
-    const [optionTileSize, setOptionTileSize] = useState('256'); // 256 or 512
+    const [optionKind, setOptionKind] = useState('radar');
+    const [optionColorScheme, setOptionColorScheme] = useState(2); // Default to 'Universal Blue'
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-                const data = await response.json();
-                setMapFrames(getFrames(data, optionKind));
-            } catch (error) {
+        axios.get('http://127.0.0.1:8000/api/weather-maps/')
+            .then(response => {
+                setWeatherData(response.data);
+                initializeMap(response.data);
+            })
+            .catch(error => {
                 console.error('Error fetching weather data:', error);
-            }
-        };
-
-        fetchData();
+            });
 
         return () => {
+            if (map) map.remove();
             if (animationTimer) clearTimeout(animationTimer);
         };
-    }, [optionKind]);
+    }, []);
 
-    useEffect(() => {
-        if (mapRef.current && mapFrames.length > 0) {
-            initializeMap();
-            showFrame(animationPosition);
-        }
-    }, [mapFrames]);
-
-    const initializeMap = () => {
-        const map = L.map(mapRef.current).setView([0, 0], 1);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-        }).addTo(map);
-        mapRef.current = map;
-    };
-
-    const getFrames = (data, kind) => {
-        let frames = [];
-        if (!data) return frames;
-
-        if (kind === 'satellite' && data.satellite && data.satellite.infrared) {
-            frames = data.satellite.infrared;
-        } else if (data.radar && data.radar.past) {
-            frames = data.radar.past;
-            if (data.radar.nowcast) {
-                frames = frames.concat(data.radar.nowcast);
-            }
-        }
-        return frames;
-    };
-
-    const showFrame = (position) => {
-        const nextPosition = position >= mapFrames.length ? 0 : position < 0 ? mapFrames.length - 1 : position;
-        setAnimationPosition(nextPosition);
-        changeRadarPosition(nextPosition);
-    };
-
-    const changeRadarPosition = (position) => {
-        if (!mapRef.current || !mapFrames[position]) return;
-
-        const frame = mapFrames[position];
-        const colorScheme = optionKind === 'satellite' ? 0 : parseInt(optionColorScheme);
-        const tileSize = parseInt(optionTileSize);
-        const url = `${frame.path}/${tileSize}/{z}/{x}/{y}/${colorScheme}/1_1.png`;
-
-        const layer = L.tileLayer(`https://${url}`, {
-            tileSize: tileSize,
-            zIndex: frame.time
+    const initializeMap = (data) => {
+        const initialMap = new maplibre.Map({
+            container: mapContainer.current,
+            style: 'https://api.maptiler.com/maps/basic/style.json?key=zSKe702Zq1told0U6bDZ',
+            center: [84.1240, 28.3949], // Centered on Nepal
+            zoom: 6
         });
 
-        mapRef.current.eachLayer((layer) => {
-            if (layer instanceof L.TileLayer) {
-                mapRef.current.removeLayer(layer);
+        setMap(initialMap);
+
+        initialMap.on('load', () => {
+            if (optionKind === 'radar' && data.radar && data.radar.past.length > 0) {
+                addLayer(data.radar.past[0].path, initialMap);
+            } else if (optionKind === 'satellite' && data.satellite && data.satellite.infrared.length > 0) {
+                addLayer(data.satellite.infrared[0].path, initialMap);
             }
         });
-
-        layer.addTo(mapRef.current);
-
-        const pastOrForecast = frame.time > Date.now() / 1000 ? 'FORECAST' : 'PAST';
-        document.getElementById('timestamp').innerHTML = `${pastOrForecast}: ${new Date(frame.time * 1000).toString()}`;
     };
 
-    const stop = () => {
+    const addLayer = (framePath, mapInstance) => {
+        if (!mapInstance.getLayer(framePath)) {
+            mapInstance.addSource(framePath, {
+                type: 'raster',
+                tiles: [
+                    `https://tilecache.rainviewer.com${framePath}/256/{z}/{x}/{y}/${optionColorScheme}/1_1.png`
+                ],
+                tileSize: 256
+            });
+
+            mapInstance.addLayer({
+                id: framePath,
+                type: 'raster',
+                source: framePath,
+                paint: {
+                    'raster-opacity': 0.6
+                }
+            });
+        }
+    };
+
+    const changeFrame = (position) => {
+        if (!weatherData) return;
+
+        let frame;
+        if (optionKind === 'radar' && weatherData.radar && weatherData.radar.past.length > 0) {
+            frame = weatherData.radar.past[position];
+        } else if (optionKind === 'satellite' && weatherData.satellite && weatherData.satellite.infrared.length > 0) {
+            frame = weatherData.satellite.infrared[position];
+        }
+
+        if (frame) {
+            addLayer(frame.path, map);
+            setAnimationPosition(position);
+            document.getElementById("timestamp").innerText = `FRAME TIME: ${new Date(frame.time * 1000).toString()}`;
+        }
+    };
+
+    const playAnimation = () => {
+        if (!weatherData) return;
+        const nextPosition = (animationPosition + 1) % (optionKind === 'radar' ? weatherData.radar.past.length : weatherData.satellite.infrared.length);
+        changeFrame(nextPosition);
+        setAnimationTimer(setTimeout(playAnimation, 500)); // Animation interval (500ms)
+    };
+
+    const stopAnimation = () => {
         if (animationTimer) {
             clearTimeout(animationTimer);
             setAnimationTimer(null);
         }
     };
 
-    const playStop = () => {
+    const togglePlayStop = () => {
         if (animationTimer) {
-            stop();
+            stopAnimation();
         } else {
-            const timer = setInterval(() => {
-                showFrame(animationPosition + 1);
-            }, 500);
-            setAnimationTimer(timer);
+            playAnimation();
         }
     };
 
-    const setKind = (kind) => {
+    const handleKindChange = (kind) => {
         setOptionKind(kind);
-        setMapFrames(getFrames(apiData, kind));
+        if (weatherData) {
+            initializeMap(weatherData);
+        }
     };
 
-    const setColors = (e) => {
-        const colorScheme = e.target.value;
-        setOptionColorScheme(colorScheme);
-    };
-
-    const setTileSize = (e) => {
-        const tileSize = e.target.value;
-        setOptionTileSize(tileSize);
+    const handleColorSchemeChange = (event) => {
+        setOptionColorScheme(event.target.value);
+        if (weatherData) {
+            initializeMap(weatherData);
+        }
     };
 
     return (
-        <div style={{ position: 'relative', height: '100vh' }}>
-            <ul style={{ textAlign: 'center', position: 'absolute', top: 0, left: 0, right: 0, height: 50 }}>
+        <div>
+            <ul className="controls">
                 <li>
-                    <input type="radio" name="kind" checked={optionKind === 'radar'} onChange={() => setKind('radar')} />
-                    Radar (Past + Future)
-                    <input type="radio" name="kind" checked={optionKind === 'satellite'} onChange={() => setKind('satellite')} />
-                    Infrared Satellite
+                    <input type="radio" name="kind" checked={optionKind === 'radar'} onChange={() => handleKindChange('radar')} />Radar (Past + Future)
+                    <input type="radio" name="kind" checked={optionKind === 'satellite'} onChange={() => handleKindChange('satellite')} />Infrared Satellite
                 </li>
+                <li><button onClick={() => changeFrame(animationPosition - 1)}>&lt;</button></li>
+                <li><button onClick={togglePlayStop}>{animationTimer ? 'Stop' : 'Play'}</button></li>
+                <li><button onClick={() => changeFrame(animationPosition + 1)}>&gt;</button></li>
                 <li>
-                    <input type="button" onClick={() => { stop(); showFrame(animationPosition - 1); }} value="&lt;" />
-                </li>
-                <li>
-                    <input type="button" onClick={playStop} value="Play / Stop" />
-                </li>
-                <li>
-                    <input type="button" onClick={() => { stop(); showFrame(animationPosition + 1); }} value="&gt;" />
-                </li>
-                <li>
-                    <select id="colors" value={optionColorScheme} onChange={setColors}>
+                    <select id="colors" value={optionColorScheme} onChange={handleColorSchemeChange}>
                         <option value="0">Black and White Values</option>
                         <option value="1">Original</option>
                         <option value="2">Universal Blue</option>
@@ -273,20 +673,17 @@ const WeatherMap = () => {
                         <option value="8">Dark Sky</option>
                     </select>
                 </li>
-                <li>
-                    <select id="tileSize" value={optionTileSize} onChange={setTileSize}>
-                        <option value="256">Tile Size: 256</option>
-                        <option value="512">Tile Size: 512</option>
-                    </select>
-                </li>
             </ul>
-            <div id="timestamp" style={{ textAlign: 'center', position: 'absolute', top: 50, left: 0, right: 0, height: 80 }}>FRAME TIME</div>
-            <div id="mapid" style={{ position: 'absolute', top: 80, left: 0, bottom: 0, right: 0 }} ref={mapRef}></div>
+            <div ref={mapContainer} className="map-container" />
+            <div id="timestamp" className="timestamp">
+                FRAME TIME
+            </div>
         </div>
     );
 };
 
 export default WeatherMap;
+
 
 
 
