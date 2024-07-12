@@ -1,25 +1,27 @@
 const express = require('express');
-const axios = require('axios');
+const request = require('request');
 const cors = require('cors');
+
 const app = express();
+const PORT = 5000;
 
 app.use(cors());
 
-app.get('/proxy', async (req, res) => {
+app.get('/proxy', (req, res) => {
     const { url } = req.query;
-
     if (!url) {
-        return res.status(400).send('No URL provided');
+        return res.status(400).send('Missing url parameter');
     }
-
-    try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+    request({ url, encoding: null }, (error, response, body) => {
+        if (error) {
+            console.error('Error:', error);
+            return res.status(500).send('Internal Server Error');
+        }
         res.set('Content-Type', response.headers['content-type']);
-        res.send(response.data);
-    } catch (error) {
-        res.status(500).send('Error fetching data');
-    }
+        res.send(body);
+    });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Proxy server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Proxy server running on port ${PORT}`);
+});
