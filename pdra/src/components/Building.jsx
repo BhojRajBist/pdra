@@ -653,7 +653,6 @@
 // export default WeatherMap;
 
 
-
 import React, { useEffect, useState, useRef } from 'react';
 import maplibre from 'maplibre-gl';
 import axios from 'axios';
@@ -824,6 +823,7 @@ const WeatherMap = () => {
 };
 
 export default WeatherMap;
+
 
 
 
